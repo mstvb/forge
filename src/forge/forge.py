@@ -63,15 +63,15 @@ class Forge:
             return hashlib.sha1(data).hexdigest()
         return hashlib.sha1(str(data).encode("utf-8")).hexdigest()
 
-    def _hash_bytes(self, data: bytes) -> str:
+    def hash_bytes(self, data: bytes) -> str:
         return hashlib.sha1(data).hexdigest()
 
-    def _relpath(self, path: str) -> str:
+    def path(self, path: str) -> str:
         """Normalize a path to be relative to repo root, with forward slashes for stability."""
         p = os.path.relpath(path, start=os.getcwd())
         return p.replace("\\", "/")
 
-    def _abspath(self, rel: str) -> str:
+    def abspath(self, rel: str) -> str:
         return os.path.abspath(rel)
 
     def _read_json(self, path: str, default):
@@ -85,30 +85,30 @@ class Forge:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, sort_keys=True)
 
-    def _get_index(self):
+    def index(self):
         return self._read_json(self.index_path, {})
 
-    def _save_index(self, index):
+    def save_index(self, index):
         # ensure keys normalized
-        norm = {self._relpath(k): v for k, v in index.items()}
+        norm = {self.path(k): v for k, v in index.items()}
         self._write_json(self.index_path, norm)
 
-    def _read_head(self):
+    def read_head(self):
         try:
             with open(self.head_path, "r", encoding="utf-8") as f:
                 return f.read().strip() or None
         except FileNotFoundError:
             return None
 
-    def _write_head(self, commit_hash: str):
+    def write_head(self, commit_hash: str):
         with open(self.head_path, "w", encoding="utf-8") as f:
             f.write(commit_hash + "\n")
 
-    def _read_commit(self, commit_hash: str):
+    def read_commit(self, commit_hash: str):
         path = os.path.join(self.commits_path, commit_hash)
         return self._read_json(path, None)
 
-    def _write_commit(self, commit_hash: str, data: dict):
+    def write_commit(self, commit_hash: str, data: dict):
         path = os.path.join(self.commits_path, commit_hash)
         self._write_json(path, data)
 
@@ -121,7 +121,7 @@ def cli():
 
 @cli.command()
 def init():
-    """Initialisiert eines neuen Repository."""
+    """Initialisiert ein neues Repository."""
     f = Forge()
     if os.path.exists(f.base_path):
         click.secho("[Forge] >> Repository existiert bereits.", fg="red", bold=True)
@@ -132,7 +132,7 @@ def init():
         # create empty HEAD and index
         with open(f.head_path, "w", encoding="utf-8") as _:
             _.write("")
-        f._save_index({})
+        f.save_index({})
         click.secho("[Forge] >> Repository erfolgreich initalisiert", fg="green", bold=True)
 
 @cli.command()
@@ -142,7 +142,7 @@ def add(add_all, files):
     """Fügt Dateien zum Repository hinzu."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
 
     # Sammle Kandidaten
     candidates = []
@@ -172,15 +172,15 @@ def add(add_all, files):
         except Exception as e:
             click.secho(f"[Forge] >> Konnte {path} nicht lesen: {e}", fg='red')
             continue
-        file_hash = f._hash_bytes(content)
+        file_hash = f.hash_bytes(content)
         obj_path = os.path.join(f.objects_path, file_hash)
         if not os.path.exists(obj_path):
             with open(obj_path, 'wb') as obj:
                 obj.write(content)
-        index[f._relpath(path)] = file_hash
+        index[f.path(path)] = file_hash
         added += 1
 
-    f._save_index(index)
+    f.save_index(index)
     click.secho(f"[Forge] >> {added} Datei(en) hinzugefügt.", fg="green", bold=True)
 
 @cli.command()
@@ -189,11 +189,11 @@ def commit(message):
     """Erstellt einen Snapshot mit einer Nachricht."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
     if not index:
         click.secho("[Forge] >> Keine Dateien für einen Snapshot.", fg="red", bold=True)
         return
-    parent = f._read_head()
+    parent = f.read_head()
     commit_data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "message": message,
@@ -202,8 +202,8 @@ def commit(message):
     }
     # stabile Hash-Bildung
     commit_hash = hashlib.sha1(json.dumps(commit_data, sort_keys=True).encode("utf-8")).hexdigest()
-    f._write_commit(commit_hash, commit_data)
-    f._write_head(commit_hash)
+    f.write_commit(commit_hash, commit_data)
+    f.write_head(commit_hash)
     click.secho(f"[Forge] >> Commit {commit_hash[:7]} gespeichert.", fg="green", bold=True)
 
 # ... (vorheriger Code bleibt gleich)
@@ -213,7 +213,7 @@ def status():
     """Zeigt den aktuellen Zustand: staged, geändert, gelöscht, untracked."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
 
     staged = []
     modified = []
@@ -222,7 +222,7 @@ def status():
 
     # Check indexed files against working tree
     for rel, obj_hash in index.items():
-        abs_path = f._abspath(rel)
+        abs_path = f.abspath(rel)
         if not os.path.exists(abs_path):
             deleted.append(rel)
             continue
@@ -231,7 +231,7 @@ def status():
                 data = fh.read()
         except Exception:
             continue
-        h = f._hash_bytes(data)
+        h = f.hash_bytes(data)
         if h != obj_hash:
             modified.append(rel)
         else:
@@ -247,7 +247,7 @@ def status():
             path = os.path.join(root, name)
             if f.base_path in path:
                 continue
-            rel = f._relpath(path)
+            rel = f.path(path)
             if rel not in index:
                 untracked.append(rel)
 
@@ -340,16 +340,19 @@ def back(message):
 
     matches = []
     for c_hash in os.listdir(f.commits_path):
-        data = f._read_commit(c_hash)
+        data = f.read_commit(c_hash)
         if not data:
             continue
         if message.lower() in data.get('message', '').lower():
+            # noinspection PyBroadException
             try:
                 t = datetime.strptime(data['timestamp'], "%Y-%m-%d %H:%M:%S")
-            except Exception:
+            except Exception as e:
                 # Fallback: use file modification time
                 t = datetime.fromtimestamp(os.path.getmtime(os.path.join(f.commits_path, c_hash)))
+
             matches.append((t, c_hash, data))
+
 
     if not matches:
         click.secho(f"[Forge] >> Kein Snapshot mit Nachricht '{message}' gefunden.", fg="red", bold=True)
@@ -365,7 +368,7 @@ def back(message):
         if not os.path.exists(obj_file):
             click.secho(f"[Forge] >> Objekt {obj_hash} für {rel_path} fehlt.", fg="red")
             continue
-        abs_path = f._abspath(rel_path)
+        abs_path = f.abspath(rel_path)
         dir_name = os.path.dirname(abs_path)
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
@@ -373,8 +376,8 @@ def back(message):
             out.write(o.read())
 
     # Index aktualisieren und HEAD setzen
-    f._save_index(chosen_data.get('files', {}))
-    f._write_head(chosen_hash)
+    f.save_index(chosen_data.get('files', {}))
+    f.write_head(chosen_hash)
     click.secho(f"[Forge] >> Repository auf Snapshot {chosen_hash[:7]} ('{chosen_data.get('message', '')}') zurückgesetzt.", fg="green", bold=True)
 
 @cli.command()
@@ -382,14 +385,14 @@ def log():
     """Listet die Commit-Historie entlang von HEAD (jüngster zuerst)."""
     f = Forge()
     f.ensure_repo()
-    head = f._read_head()
+    head = f.read_head()
 
     chain = []
     visited = set()
     current = head
     while current and current not in visited:
         visited.add(current)
-        data = f._read_commit(current)
+        data = f.read_commit(current)
         if not data:
             break
         chain.append((current, data))
@@ -403,7 +406,7 @@ def log():
             return
         click.secho("--- Snapshots (unsortiert) ---", fg="green")
         for c_hash in sorted(commits, reverse=True):
-            data = f._read_commit(c_hash)
+            data = f.read_commit(c_hash)
             if not data:
                 continue
             click.secho(f"[{c_hash[:7]}] {data.get('timestamp','?')} | {data.get('message','')}" , fg="blue", bold=True)
@@ -424,15 +427,15 @@ def rm(cached, paths):
     if not paths:
         click.secho("[Forge] >> Keine Pfade angegeben.", fg='red', bold=True)
         return
-    index = f._get_index()
+    index = f.index()
     removed = 0
     for p in paths:
-        rel = f._relpath(p)
+        rel = f.path(p)
         if rel in index:
             del index[rel]
             removed += 1
             if not cached:
-                abs_p = f._abspath(rel)
+                abs_p = f.abspath(rel)
                 if os.path.exists(abs_p) and os.path.isfile(abs_p):
                     try:
                         os.remove(abs_p)
@@ -440,7 +443,7 @@ def rm(cached, paths):
                         click.secho(f"[Forge] >> Konnte {abs_p} nicht löschen: {e}", fg='red')
         else:
             click.secho(f"[Forge] >> {rel} nicht im Index.", fg='yellow')
-    f._save_index(index)
+    f.save_index(index)
     click.secho(f"[Forge] >> {removed} Pfad(e) entfernt.", fg='green', bold=True)
 
 
@@ -448,8 +451,8 @@ def _is_text_bytes(b: bytes) -> bool:
     try:
         b.decode('utf-8')
         return True
-    except Exception:
-        return False
+    except Exception as e:
+        raise e
 
 
 @cli.command()
@@ -459,14 +462,14 @@ def restore(restore_all, paths):
     """Stellt Dateien aus dem Index wieder her (aus Objekten)."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
 
     targets = []
     if restore_all or not paths:
         targets = list(index.keys())
     else:
         for p in paths:
-            rel = f._relpath(p)
+            rel = f.path(p)
             if rel in index:
                 targets.append(rel)
             else:
@@ -481,7 +484,7 @@ def restore(restore_all, paths):
         if not os.path.exists(obj_file):
             click.secho(f"[Forge] >> Objekt {obj_hash} fehlt für {rel}.", fg='red')
             continue
-        abs_path = f._abspath(rel)
+        abs_path = f.abspath(rel)
         os.makedirs(os.path.dirname(abs_path) or '.', exist_ok=True)
         with open(obj_file, 'rb') as src, open(abs_path, 'wb') as dst:
             dst.write(src.read())
@@ -495,11 +498,11 @@ def diff(paths):
     """Zeigt Unterschiede zwischen Arbeitsverzeichnis und Index."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
 
-    def show_diff_for(rel):
-        abs_path = f._abspath(rel)
-        obj_hash = index.get(rel)
+    def show_diff_for(r):
+        abs_path = f.abspath(r)
+        obj_hash = index.get(r)
         if obj_hash is None:
             # untracked: show as added
             if not os.path.exists(abs_path):
@@ -507,42 +510,41 @@ def diff(paths):
             with open(abs_path, 'rb') as fh:
                 b = fh.read()
             if not _is_text_bytes(b):
-                click.secho(f"Binary file {rel} differs (untracked)", fg='yellow')
+                click.secho(f"Binary file {r} differs (untracked)", fg='yellow')
                 return
             text = b.decode('utf-8', errors='replace').splitlines(keepends=False)
-            ud = difflib.unified_diff([], text, fromfile=f"a/{rel}", tofile=f"b/{rel}")
+            ud = difflib.unified_diff([], text, fromfile=f"a/{r}", tofile=f"b/{r}")
             click.echo('\n'.join(ud))
             return
         obj_file = os.path.join(f.objects_path, obj_hash)
         if not os.path.exists(obj_file):
-            click.secho(f"[Forge] >> Objekt {obj_hash} fehlt für {rel}.", fg='red')
+            click.secho(f"[Forge] >> Objekt {obj_hash} fehlt für {r}.", fg='red')
             return
         with open(obj_file, 'rb') as fh:
             ob = fh.read()
         if not os.path.exists(abs_path):
-            # deleted in working tree
             if _is_text_bytes(ob):
                 a = ob.decode('utf-8', errors='replace').splitlines(False)
-                ud = difflib.unified_diff(a, [], fromfile=f"a/{rel}", tofile=f"b/{rel}")
+                ud = difflib.unified_diff(a, [], fromfile=f"a/{r}", tofile=f"b/{r}")
                 click.echo('\n'.join(ud))
             else:
-                click.secho(f"Binary file {rel} deleted", fg='yellow')
+                click.secho(f"Binary file {r} deleted", fg='yellow')
             return
         with open(abs_path, 'rb') as fh:
             wb = fh.read()
         if not _is_text_bytes(ob) or not _is_text_bytes(wb):
             if ob != wb:
-                click.secho(f"Binary file {rel} differs", fg='yellow')
+                click.secho(f"Binary file {r} differs", fg='yellow')
             return
         a = ob.decode('utf-8', errors='replace').splitlines(False)
         b = wb.decode('utf-8', errors='replace').splitlines(False)
         if a == b:
             return
-        ud = difflib.unified_diff(a, b, fromfile=f"a/{rel}", tofile=f"b/{rel}")
+        ud = difflib.unified_diff(a, b, fromfile=f"a/{r}", tofile=f"b/{r}")
         click.echo('\n'.join(ud))
 
     if paths:
-        rels = [f._relpath(p) for p in paths]
+        rels = [f.path(p) for p in paths]
     else:
         # default: all indexed files
         rels = sorted(set(list(index.keys())))
@@ -555,7 +557,7 @@ def diff(paths):
                 p = os.path.join(root, name)
                 if f.base_path in p:
                     continue
-                rels.append(f._relpath(p))
+                rels.append(f.path(p))
         rels = sorted(set(rels))
 
     for rel in rels:
@@ -569,7 +571,7 @@ def show(object_hash, path_arg):
     """Zeigt Inhalt eines Objekts oder eines indexierten Pfads (Textdateien)."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.index()
 
     if object_hash:
         obj_file = os.path.join(f.objects_path, object_hash)
@@ -582,14 +584,18 @@ def show(object_hash, path_arg):
             click.echo(b.decode('utf-8', errors='replace'))
         else:
             click.secho("[Forge] >> Binärdaten (nicht dargestellt)", fg='yellow')
-        return
+        return None
 
     if path_arg:
-        rel = f._relpath(path_arg)
+        rel = f.path(path_arg)
         obj_hash = index.get(rel)
         if not obj_hash:
             click.secho(f"[Forge] >> {rel} nicht im Index.", fg='red')
-            return
+            return None
         return show.callback(object_hash=obj_hash, path_arg=None)  # reuse
 
     click.secho("[Forge] >> Bitte --object HASH oder --path DATEI angeben.", fg='yellow')
+    return None
+
+if __name__ == '__main__':
+    cli()
