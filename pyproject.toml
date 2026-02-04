@@ -4,14 +4,16 @@ version = "1.0.0"
 description = "Local Version Control"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "click>=8.3.1",
+]
 author = "mstvb | Manuel Staufer"
 author_email = "manuel.staufervb@gmail.com"
 classifiers = [ 
     "Development Status :: 4 - Beta",
     "Operating System :: OS Independent", 
     "Programming Language :: Python",
-    "Topic :: Software Development :: Version Control" ] 
+    "Topic :: Software Development :: Version Control" ]
 keywords = ["version", "control", "development"]
 
 [project.scripts]
