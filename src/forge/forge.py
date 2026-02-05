@@ -704,7 +704,7 @@ def diff(paths, details):
 @click.option('--object', 'object_hash', help='Objekt-Hash zum Anzeigen')
 @click.option('--path', 'path_arg', type=click.Path(), help='Indexierter Pfad zum Anzeigen')
 def show(object_hash, path_arg):
-    """Zeige den Inhalt eines gespeicherten Objekts oder einer indizierten Datei.
+    """Zeige nur die geänderten Zeilen eines gespeicherten Objekts oder einer indizierten Datei.
     
     Nur für Textdateien. Verwende --object oder --path.
     """
@@ -731,6 +731,62 @@ def show(object_hash, path_arg):
         if not obj_hash:
             click.secho(f"[Forge] >> {rel} nicht im Index.", fg='red')
             return
-        return show.callback(object_hash=obj_hash, path_arg=None)  # reuse
+        
+        # Lese die indexierte (gespeicherte) Version
+        obj_file = os.path.join(f.objects_path, obj_hash)
+        if not os.path.exists(obj_file):
+            click.secho(f"[Forge] >> Objekt {obj_hash} nicht gefunden.", fg='red')
+            return
+        
+        with open(obj_file, 'rb') as fh:
+            indexed_content = fh.read()
+        
+        # Lese die aktuelle Datei
+        try:
+            with open(os.path.abspath(rel), 'rb') as fh:
+                current_content = fh.read()
+        except FileNotFoundError:
+            click.secho(f"[Forge] >> Datei {rel} nicht gefunden.", fg='red')
+            return
+        
+        # Konvertiere zu Text
+        if not _is_text_bytes(indexed_content) or not _is_text_bytes(current_content):
+            click.secho("[Forge] >> Binärdaten (nicht dargestellt)", fg='yellow')
+            return
+        
+        indexed_text = indexed_content.decode('utf-8', errors='replace')
+        current_text = current_content.decode('utf-8', errors='replace')
+        
+        # Erzeuge Diff
+        indexed_lines = indexed_text.splitlines(keepends=True)
+        current_lines = current_text.splitlines(keepends=True)
+        
+        diff = difflib.unified_diff(
+            indexed_lines,
+            current_lines,
+            fromfile=f"{rel} (indexiert)",
+            tofile=f"{rel} (aktuell)",
+            lineterm=''
+        )
+        
+        diff_output = list(diff)
+        if not diff_output:
+            click.secho(f"[Forge] >> Keine Unterschiede in {rel}.", fg='green')
+            return
+        
+        # Zeige nur Diff-Zeilen (mit +/- Präfix)
+        for line in diff_output:
+            if line.startswith('@@'):
+                click.secho(line.rstrip('\n'), fg='cyan')
+            elif line.startswith('+'):
+                click.secho(line.rstrip('\n'), fg='green')
+            elif line.startswith('-'):
+                click.secho(line.rstrip('\n'), fg='red')
+            elif line.startswith('\\'):
+                click.secho(line.rstrip('\n'), fg='yellow')
+            else:
+                click.echo(line.rstrip('\n'))
+        
+        return
 
     click.secho("[Forge] >> Bitte --object HASH oder --path DATEI angeben.", fg='yellow')
