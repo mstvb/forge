@@ -150,27 +150,24 @@ def add(add_all, files):
     f.ensure_repo()
     index = f._get_index()
 
+    # Verzeichnisse die grundsätzlich ignoriert werden sollen
+    ignore_dirs = {'.forge', '.git', '.venv', '.idea', '__pycache__', '.pytest_cache', '.tox', '.egg-info', '.eggs', 'node_modules', '.vscode', '.env'}
+
     # Sammle Kandidaten
     candidates = []
     if add_all:
         for root, dirs, fnames in os.walk(os.getcwd()):
-            # .forge ignorieren
-            if f.base_path in root:
-                continue
-            # dirs filtern: .forge auslassen
-            dirs[:] = [d for d in dirs if os.path.join(root, d) != os.path.abspath(f.base_path)]
+            # dirs filtern: ignorierte Verzeichnisse auslassen
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+            
             for name in fnames:
                 path = os.path.join(root, name)
-                if f.base_path in path:
-                    continue
                 candidates.append(path)
     candidates.extend(files)
 
     added = 0
     for path in candidates:
         if os.path.isdir(path):
-            continue
-        if f.base_path in os.path.abspath(path):
             continue
         try:
             with open(path, 'rb') as stream:
@@ -188,6 +185,57 @@ def add(add_all, files):
 
     f._save_index(index)
     click.secho(f"[Forge] >> {added} Datei(en) hinzugefügt.", fg="green", bold=True)
+
+@cli.command()
+@click.option('--cached', is_flag=True, help='Entferne nur aus dem Index, nicht vom Disk')
+@click.option('--all', 'remove_all', is_flag=True, help='Alle Dateien aus dem Index entfernen')
+@click.argument('files', nargs=-1, type=click.Path())
+def rm(cached, remove_all, files):
+    """Entferne Dateien aus dem Index und optional vom Disk.
+    
+    Removes files from the staging area. Mit --cached wird nur der Index aktualisiert.
+    Ohne --cached werden Dateien auch vom Disk gelöscht.
+    """
+    f = Forge()
+    f.ensure_repo()
+    index = f._get_index()
+
+    if not index:
+        click.secho("[Forge] >> Index ist leer.", fg="yellow", bold=True)
+        return
+
+    # Sammle zu löschende Dateien
+    to_delete = []
+    if remove_all:
+        to_delete = list(index.keys())
+    else:
+        for path in files:
+            rel_path = f._relpath(path)
+            if rel_path in index:
+                to_delete.append(rel_path)
+            else:
+                click.secho(f"[Forge] >> '{rel_path}' nicht im Index gefunden.", fg="yellow")
+
+    removed = 0
+    for rel_path in to_delete:
+        if rel_path in index:
+            # Lösche aus dem Index
+            del index[rel_path]
+            
+            # Lösche Datei vom Disk, wenn --cached nicht gesetzt
+            if not cached:
+                abs_path = f._abspath(rel_path)
+                try:
+                    if os.path.isfile(abs_path):
+                        os.remove(abs_path)
+                except Exception as e:
+                    click.secho(f"[Forge] >> Konnte {rel_path} nicht löschen: {e}", fg="red")
+                    continue
+            
+            removed += 1
+
+    f._save_index(index)
+    click.secho(f"[Forge] >> {removed} Datei(en) entfernt.", fg="green", bold=True)
 
 @cli.command()
 @click.argument('message', type=str, required=True)
