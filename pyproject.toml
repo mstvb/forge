@@ -1,27 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "forge"
 version = "1.0.0"
 description = "Local Version Control"
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.1",
 ]
-author = "mstvb | Manuel Staufer"
-author_email = "manuel.staufervb@gmail.com"
-classifiers = [ 
+authors = [
+    {name = "mstvb | Manuel Staufer", email = "manuel.staufervb@gmail.com"}
+]
+classifiers = [
     "Development Status :: 4 - Beta",
-    "Operating System :: OS Independent", 
-    "Programming Language :: Python",
-    "Topic :: Software Development :: Version Control" ]
-keywords = ["version", "control", "development"]
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control"
+]
+
+[project.urls]
+Homepage = "https://github.com/mstvb/forge"
+Repository = "https://github.com/mstvb/forge.git"
+Documentation = "https://github.com/mstvb/forge/tree/main/docs"
+Issues = "https://github.com/mstvb/forge/issues"
 
 [project.scripts]
-forge = 'forge:cli'
+forge = "forge:cli"
 
-[dependency-groups]
-dev = [
-    "ruff>=0.15.0",
-    "ty>=0.0.14",
-    "pytest>=8.0"
-]
+[tool.uv]
+default-python = "3.12"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/forge"]

@@ -121,10 +121,7 @@ def cli():
 
 @cli.command()
 def init():
-    """Erstelle ein neues Forge-Repository im aktuellen Verzeichnis.
-    
-    Initialisiert die notwendige Verzeichnisstruktur für Versionskontrolle.
-    """
+    """Initialisiert eines neuen Repository."""
     f = Forge()
     if os.path.exists(f.base_path):
         click.secho("[Forge] >> Repository existiert bereits.", fg="red", bold=True)
@@ -139,13 +136,10 @@ def init():
         click.secho("[Forge] >> Repository erfolgreich initalisiert", fg="green", bold=True)
 
 @cli.command()
-@click.option('--all', 'add_all', is_flag=True, help='Alle Dateien rekursiv hinzufügen (ignoriert . Verzeichnisse)')
+@click.option('--all', 'add_all', is_flag=True, help='Alle Dateien (außer .forge) rekursiv hinzufügen')
 @click.argument('files', nargs=-1, type=click.Path(exists=True))
 def add(add_all, files):
-    """Indexiere Dateien für den nächsten Commit.
-    
-    Fügt Dateien dem Index hinzu. Mit --all werden alle Dateien rekursiv erfasst.
-    """
+    """Fügt Dateien zum Repository hinzu."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
@@ -192,10 +186,7 @@ def add(add_all, files):
 @cli.command()
 @click.argument('message', type=str, required=True)
 def commit(message):
-    """Erstelle einen Snapshot (Commit) des aktuellen Index mit einer Nachricht.
-    
-    Speichert den aktuellen Zustand indexierter Dateien als Snapshot.
-    """
+    """Erstellt einen Snapshot mit einer Nachricht."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
@@ -219,10 +210,7 @@ def commit(message):
 
 @cli.command()
 def status():
-    """Zeige den Status des Arbeitsverzeichnisses und des Index.
-    
-    Listet Dateien nach Status auf: indexed, modified, deleted, untracked.
-    """
+    """Zeigt den aktuellen Zustand: staged, geändert, gelöscht, untracked."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
@@ -288,10 +276,9 @@ def status():
 @cli.command()
 @click.argument('remote_path', type=click.Path())
 def push(remote_path):
-    """Synchronisiere alle Snapshots und Objekte zu einem Remote-Verzeichnis.
-    
-    Kopiert die komplette Repository-Historie zum Remote-Standort.
-    """
+    """Überträgt alle Daten in ein Remote-Verzeichnis.
+
+    Robustheit: überspringt fehlende lokale Ordner (z. B. wenn keine Objekte vorhanden sind)."""
     f = Forge()
     f.ensure_repo()
     
@@ -316,9 +303,8 @@ def push(remote_path):
 @cli.command()
 @click.argument('remote_path', type=click.Path(exists=True))
 def pull(remote_path):
-    """Lade Snapshots und Objekte von einem Remote-Repository herunter.
-    
-    Integriert neue Commits und Objekte vom Remote ohne Überschreiben.
+    """
+    Hole Dateien aus Remote-Repository
     """
     f = Forge()
     f.ensure_repo()
@@ -347,9 +333,8 @@ def pull(remote_path):
 @cli.command()
 @click.argument('message', type=str)
 def back(message):
-    """Stelle den Zustand aus einem früheren Snapshot basierend auf der Nachricht wieder her.
-    
-    Sucht einen Snapshot mit einer übereinstimmenden Nachricht und stellt ihn wieder her.
+    """
+    Setze Repository auf Snapshot mit bestimmter Nachricht zurück.
     """
     f = Forge()
     f.ensure_repo()
@@ -395,10 +380,7 @@ def back(message):
 
 @cli.command()
 def log():
-    """Zeige die Snapshot-Historie ab HEAD rückwärts.
-    
-    Listet alle Snapshots mit Zeitstempel und Nachricht in chronologischer Reihenfolge.
-    """
+    """Listet die Commit-Historie entlang von HEAD (jüngster zuerst)."""
     f = Forge()
     f.ensure_repo()
     head = f._read_head()
@@ -434,13 +416,10 @@ def log():
 
 
 @cli.command()
-@click.option('--cached', is_flag=True, help='Nur aus dem Index entfernen, Datei behalten')
+@click.option('--cached', is_flag=True, help='Nur aus dem Index entfernen, Dateien nicht löschen')
 @click.argument('paths', nargs=-1, type=click.Path())
 def rm(cached, paths):
-    """Entferne Dateien aus dem Index und optional vom Dateisystem.
-    
-    Mit --cached bleibt die Datei erhalten; ohne wird sie gelöscht.
-    """
+    """Entfernt Dateien aus dem Index und optional vom Dateisystem."""
     f = Forge()
     f.ensure_repo()
     if not paths:
@@ -478,10 +457,7 @@ def _is_text_bytes(b: bytes) -> bool:
 @click.option('--all', 'restore_all', is_flag=True, help='Alle indexierten Dateien wiederherstellen')
 @click.argument('paths', nargs=-1, type=click.Path())
 def restore(restore_all, paths):
-    """Stelle Dateien aus dem gespeicherten Index again.
-    
-    Überschreibt lokale Änderungen mit der im Index gespeicherten Version.
-    """
+    """Stellt Dateien aus dem Index wieder her (aus Objekten)."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
@@ -516,142 +492,55 @@ def restore(restore_all, paths):
 
 @cli.command()
 @click.argument('paths', nargs=-1, type=click.Path())
-@click.option('--details', is_flag=True, help='Zeige vollständige Diffs statt Zusammenfassung')
-def diff(paths, details):
-    """Vergleiche Arbeitsverzeichnis mit dem Index - Zusammenfassung oder Details.
-    
-    Zeigt standardmäßig nur Zeilenzahlen. Mit --details werden vollständige Unterschiede angezeigt.
-    """
+def diff(paths):
+    """Zeigt Unterschiede zwischen Arbeitsverzeichnis und Index."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
 
-    files_with_diff = []
-
-    def get_diff_info(rel):
-        """Gibt Informationen über die Unterschiede zurück."""
+    def show_diff_for(rel):
         abs_path = f._abspath(rel)
         obj_hash = index.get(rel)
-        
-        info = {
-            'file': rel,
-            'status': None,
-            'added_lines': 0,
-            'removed_lines': 0,
-            'is_binary': False
-        }
-        
         if obj_hash is None:
             # untracked: show as added
             if not os.path.exists(abs_path):
-                return None
+                return
             with open(abs_path, 'rb') as fh:
                 b = fh.read()
             if not _is_text_bytes(b):
-                info['status'] = 'UNTRACKED (Binary)'
-                info['is_binary'] = True
-                return info
+                click.secho(f"Binary file {rel} differs (untracked)", fg='yellow')
+                return
             text = b.decode('utf-8', errors='replace').splitlines(keepends=False)
-            info['status'] = 'NEW FILE'
-            info['added_lines'] = len(text)
-            if details:
-                info['diff'] = list(difflib.unified_diff([], text, fromfile=f"a/{rel}", tofile=f"b/{rel}"))
-            return info
-            
+            ud = difflib.unified_diff([], text, fromfile=f"a/{rel}", tofile=f"b/{rel}")
+            click.echo('\n'.join(ud))
+            return
         obj_file = os.path.join(f.objects_path, obj_hash)
         if not os.path.exists(obj_file):
             click.secho(f"[Forge] >> Objekt {obj_hash} fehlt für {rel}.", fg='red')
-            return None
-            
+            return
         with open(obj_file, 'rb') as fh:
             ob = fh.read()
-            
         if not os.path.exists(abs_path):
             # deleted in working tree
             if _is_text_bytes(ob):
-                info['status'] = 'DELETED'
                 a = ob.decode('utf-8', errors='replace').splitlines(False)
-                info['removed_lines'] = len(a)
-                if details:
-                    info['diff'] = list(difflib.unified_diff(a, [], fromfile=f"a/{rel}", tofile=f"b/{rel}"))
+                ud = difflib.unified_diff(a, [], fromfile=f"a/{rel}", tofile=f"b/{rel}")
+                click.echo('\n'.join(ud))
             else:
-                info['status'] = 'DELETED (Binary)'
-                info['is_binary'] = True
-            return info
-            
+                click.secho(f"Binary file {rel} deleted", fg='yellow')
+            return
         with open(abs_path, 'rb') as fh:
             wb = fh.read()
-            
         if not _is_text_bytes(ob) or not _is_text_bytes(wb):
             if ob != wb:
-                info['status'] = 'MODIFIED (Binary)'
-                info['is_binary'] = True
-            else:
-                return None
-            return info
-            
+                click.secho(f"Binary file {rel} differs", fg='yellow')
+            return
         a = ob.decode('utf-8', errors='replace').splitlines(False)
         b = wb.decode('utf-8', errors='replace').splitlines(False)
-        
         if a == b:
-            return None
-            
-        info['status'] = 'MODIFIED'
-        diff = list(difflib.unified_diff(a, b, fromfile=f"a/{rel}", tofile=f"b/{rel}"))
-        info['added_lines'] = sum(1 for line in diff if line.startswith('+') and not line.startswith('+++'))
-        info['removed_lines'] = sum(1 for line in diff if line.startswith('-') and not line.startswith('---'))
-        
-        if details:
-            info['diff'] = diff
-        return info
-
-    def print_diff_details(info):
-        """Drucke die vollständigen Diff-Details."""
-        status_colors = {
-            'NEW FILE': 'green',
-            'MODIFIED': 'yellow',
-            'DELETED': 'red',
-            'UNTRACKED (Binary)': 'yellow',
-            'MODIFIED (Binary)': 'yellow',
-            'DELETED (Binary)': 'red'
-        }
-        color = status_colors.get(info['status'], 'white')
-        click.secho(f"\n📄 {info['file']} ({info['status']})", fg=color, bold=True)
-        
-        if 'diff' in info:
-            for line in info['diff']:
-                if line.startswith('+++') or line.startswith('---'):
-                    click.secho(line, fg='cyan')
-                elif line.startswith('+'):
-                    click.secho(line, fg='green')
-                elif line.startswith('-'):
-                    click.secho(line, fg='red')
-                elif line.startswith('@@'):
-                    click.secho(line, fg='blue')
-                else:
-                    click.echo(line)
-
-    def print_summary(info):
-        """Drucke eine Zusammenfassung."""
-        status_colors = {
-            'NEW FILE': 'green',
-            'MODIFIED': 'yellow',
-            'DELETED': 'red',
-            'UNTRACKED (Binary)': 'yellow',
-            'MODIFIED (Binary)': 'yellow',
-            'DELETED (Binary)': 'red'
-        }
-        color = status_colors.get(info['status'], 'white')
-        
-        if info['is_binary']:
-            click.secho(f"  {info['file']:<50} {info['status']}", fg=color)
-        else:
-            lines_info = ""
-            if info['added_lines'] > 0:
-                lines_info += f"+{info['added_lines']} "
-            if info['removed_lines'] > 0:
-                lines_info += f"-{info['removed_lines']}"
-            click.secho(f"  {info['file']:<50} {info['status']:<20} {lines_info}", fg=color)
+            return
+        ud = difflib.unified_diff(a, b, fromfile=f"a/{rel}", tofile=f"b/{rel}")
+        click.echo('\n'.join(ud))
 
     if paths:
         rels = [f._relpath(p) for p in paths]
@@ -660,54 +549,25 @@ def diff(paths, details):
         rels = sorted(set(list(index.keys())))
         # plus untracked files
         for root, dirs, files in os.walk(os.getcwd()):
-            # skip directories starting with .
-            if any(part.startswith('.') for part in root.split(os.sep)):
+            if f.base_path in root:
                 continue
-            # Remove directories starting with . from traversal
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            dirs[:] = [d for d in dirs if os.path.join(root, d) != os.path.abspath(f.base_path)]
             for name in files:
                 p = os.path.join(root, name)
-                if any(part.startswith('.') for part in p.split(os.sep)):
+                if f.base_path in p:
                     continue
                 rels.append(f._relpath(p))
         rels = sorted(set(rels))
-    
-    # Sammle alle Diffs
+
     for rel in rels:
-        info = get_diff_info(rel)
-        if info:
-            files_with_diff.append(info)
-    
-    if not files_with_diff:
-        click.secho("[Forge] >> Keine Unterschiede gefunden.", fg='green', bold=True)
-        return
-    
-    if details:
-        # Zeige vollständige Details an
-        for info in files_with_diff:
-            print_diff_details(info)
-        click.secho(f"\n[Forge] >> {len(files_with_diff)} Datei(en) mit Unterschieden.", fg='cyan', bold=True)
-    else:
-        # Zeige Zusammenfassung an
-        click.secho("[Forge] Unterschiede:", fg='cyan', bold=True)
-        total_added = 0
-        total_removed = 0
-        for info in files_with_diff:
-            print_summary(info)
-            total_added += info['added_lines']
-            total_removed += info['removed_lines']
-        
-        click.secho(f"\n[Forge] >> {len(files_with_diff)} Datei(en) | +{total_added} -{total_removed}", fg='cyan', bold=True)
+        show_diff_for(rel)
 
 
 @cli.command()
-@click.option('--object', 'object_hash', help='Objekt-Hash zum Anzeigen')
-@click.option('--path', 'path_arg', type=click.Path(), help='Indexierter Pfad zum Anzeigen')
+@click.option('--object', 'object_hash', help='Objekt-Hash anzeigen')
+@click.option('--path', 'path_arg', type=click.Path(), help='Inhalt eines indexierten Pfads anzeigen')
 def show(object_hash, path_arg):
-    """Zeige den Inhalt eines gespeicherten Objekts oder einer indizierten Datei.
-    
-    Nur für Textdateien. Verwende --object oder --path.
-    """
+    """Zeigt Inhalt eines Objekts oder eines indexierten Pfads (Textdateien)."""
     f = Forge()
     f.ensure_repo()
     index = f._get_index()
