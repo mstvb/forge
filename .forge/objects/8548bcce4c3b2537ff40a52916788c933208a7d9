@@ -1,6 +1,0 @@
-0000000000000000000000000000000000000000 169bf676950da1d71f743be8b3c88ac9b241f20c root <root@4ae633a8-4973-41cf-a2cf-e6c16addd389.jmi21fcehg3unfegezsteryjgd.ax.internal.cloudapp.net> 1770193934 +0000	clone: from https://github.com/mstvb/forge
-169bf676950da1d71f743be8b3c88ac9b241f20c 124c11be620ec146e474f9aad1fc3dbbe681254d Manuel Staufer <tuxlergamer@gmail.com> 1770225741 +0000	commit: Test Version for @fm-labs
-124c11be620ec146e474f9aad1fc3dbbe681254d 37fbff4faddde4d64efd3cff733379d59553e02c Manuel Staufer <tuxlergamer@gmail.com> 1770271900 +0000	pull --tags origin main: Fast-forward
-37fbff4faddde4d64efd3cff733379d59553e02c ada5ec63f358f9bba1e2760065c91758c2345bed Manuel Staufer <tuxlergamer@gmail.com> 1770275377 +0000	commit: .forge Workflow added and optimized Outputs and added Options
-ada5ec63f358f9bba1e2760065c91758c2345bed cf4a709ec8579e821f619b05519f7580724c4f26 Manuel Staufer <tuxlergamer@gmail.com> 1770291687 +0000	commit: Tested and optimized (diff)
-cf4a709ec8579e821f619b05519f7580724c4f26 48b9a5425321d40f08d85c021fe549e123ea44cc Manuel Staufer <tuxlergamer@gmail.com> 1770291758 +0000	commit: Has forget to commit Snapshot
