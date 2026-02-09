@@ -19,40 +19,43 @@ def secho(message, fg=None, bold=False, err=False, force=False):
         return
     click.secho(message, fg=fg, bold=bold, err=err)
 
+
+def _hash_file(data):
+    """Backward-compatible: hash a text string (UTF-8). Prefer _hash_bytes."""
+    if isinstance(data, bytes):
+        return hashlib.sha1(data).hexdigest()
+    return hashlib.sha1(str(data).encode("utf-8")).hexdigest()
+
+
+def _hash_bytes(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
+
+
+def relpath(path: str) -> str:
+    """Normalize a path to be relative to repo root, with forward slashes for stability."""
+    p = os.path.relpath(path, start=os.getcwd())
+    return p.replace("\\", "/")
+
+
+def abspath(rel: str) -> str:
+    return os.path.abspath(rel)
+
+
+def _read_json(path: str, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default
+
+
+def _write_json(path: str, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+
+
 class Forge:
     """
-    Parameters
-    ----------
-    base_path : str | default = '.forge'
-        Path of Forge
-
-    Attributes
-    ----------
-    base_path : str
-        Path of Forge
-
-    objects_path : str
-        Path of Objects
-
-    commit_path : str
-        Path of Commits
-
-    index_path : str
-        Path of Indexes
-
-    Methods
-    -------
-    ensure_repo()
-        Check Forge is Initialized
-
-    _hash_file(data)
-        Hash Files for Version Control
-
-    _get_index()
-        Returns Index of Repository
-
-    _save_index()
-        Save Index of Repository
     """
     def __init__(self, base_path: str = '.forge'):
         self.base_path = base_path
@@ -65,7 +68,7 @@ class Forge:
 
     def ensure_repo(self):
         if not os.path.exists(self.base_path):
-            secho("Fehler: Kein Repository gefunden. Schmiede ein neues Repository mit 'forge init'.", fg='red', force=True)
+            secho("Error: No Repository found. Create new Repository with 'forge init'.", fg='red', force=True)
             exit(1)
         # Ensure subdirectories exist for robustness
         os.makedirs(self.objects_path, exist_ok=True)
@@ -73,60 +76,32 @@ class Forge:
         os.makedirs(self.tags_path, exist_ok=True)
         os.makedirs(self.branches_path, exist_ok=True)
 
-    def _hash_file(self, data):
-        """Backward-compatible: hash a text string (UTF-8). Prefer _hash_bytes."""
-        if isinstance(data, bytes):
-            return hashlib.sha1(data).hexdigest()
-        return hashlib.sha1(str(data).encode("utf-8")).hexdigest()
+    def get_index(self):
+        return _read_json(self.index_path, {})
 
-    def _hash_bytes(self, data: bytes) -> str:
-        return hashlib.sha1(data).hexdigest()
-
-    def _relpath(self, path: str) -> str:
-        """Normalize a path to be relative to repo root, with forward slashes for stability."""
-        p = os.path.relpath(path, start=os.getcwd())
-        return p.replace("\\", "/")
-
-    def _abspath(self, rel: str) -> str:
-        return os.path.abspath(rel)
-
-    def _read_json(self, path: str, default):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return default
-
-    def _write_json(self, path: str, data):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-
-    def _get_index(self):
-        return self._read_json(self.index_path, {})
-
-    def _save_index(self, index):
+    def save_index(self, index):
         # ensure keys normalized
-        norm = {self._relpath(k): v for k, v in index.items()}
-        self._write_json(self.index_path, norm)
+        norm = {relpath(k): v for k, v in index.items()}
+        _write_json(self.index_path, norm)
 
-    def _read_head(self):
+    def read_head(self):
         try:
             with open(self.head_path, "r", encoding="utf-8") as f:
                 return f.read().strip() or None
         except FileNotFoundError:
             return None
 
-    def _write_head(self, commit_hash: str):
+    def write_head(self, commit_hash: str):
         with open(self.head_path, "w", encoding="utf-8") as f:
             f.write(commit_hash + "\n")
 
-    def _read_commit(self, commit_hash: str):
+    def read_commit(self, commit_hash: str):
         path = os.path.join(self.commits_path, commit_hash)
-        return self._read_json(path, None)
+        return _read_json(path, None)
 
-    def _write_commit(self, commit_hash: str, data: dict):
+    def write_commit(self, commit_hash: str, data: dict):
         path = os.path.join(self.commits_path, commit_hash)
-        self._write_json(path, data)
+        _write_json(path, data)
 
 # --- CLI Definition mit Click ---
 
@@ -145,7 +120,7 @@ def init():
     """Initialisiert eines neuen Repository."""
     f = Forge()
     if os.path.exists(f.base_path):
-        secho("[Forge] >> Repository existiert bereits.", fg="red", bold=True)
+        secho("[Forge] >> Repository already exists", fg="red", bold=True)
 
     else:
         for path in [f.base_path, f.objects_path, f.commits_path, f.tags_path, f.branches_path]:
@@ -153,17 +128,17 @@ def init():
         # create empty HEAD and index
         with open(f.head_path, "w", encoding="utf-8") as _:
             _.write("")
-        f._save_index({})
-        secho("[Forge] >> Repository erfolgreich initalisiert", fg="green", bold=True)
+        f.save_index({})
+        secho("[Forge] >> Repository successfully initialized", fg="green", bold=True)
 
 @cli.command()
-@click.option('--all', 'add_all', is_flag=True, help='Alle Dateien (außer .forge) rekursiv hinzufügen')
+@click.option('--all', 'add_all', is_flag=True, help='All Data added')
 @click.argument('files', nargs=-1, type=click.Path(exists=True))
 def add(add_all, files):
     """Fügt Dateien zum Repository hinzu."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
 
     # Sammle Kandidaten
     candidates = []
@@ -190,19 +165,19 @@ def add(add_all, files):
         try:
             with open(path, 'rb') as stream:
                 content = stream.read()
-        except Exception as e:
-            secho(f"[Forge] >> Konnte {path} nicht lesen: {e}", fg='red')
+        except FileNotFoundError as e:
+            secho(f"[Forge] >> Cannot read {e} from {path}", fg='red')
             continue
-        file_hash = f._hash_bytes(content)
+        file_hash = _hash_bytes(content)
         obj_path = os.path.join(f.objects_path, file_hash)
         if not os.path.exists(obj_path):
             with open(obj_path, 'wb') as obj:
                 obj.write(content)
-        index[f._relpath(path)] = file_hash
+        index[relpath(path)] = file_hash
         added += 1
 
-    f._save_index(index)
-    secho(f"[Forge] >> {added} Datei(en) hinzugefügt.", fg="green", bold=True)
+    f.save_index(index)
+    secho(f"[Forge] >> {added} Data added", fg="green", bold=True)
 
 @cli.command()
 @click.argument('message', type=str, required=True)
@@ -210,11 +185,11 @@ def commit(message):
     """Erstellt einen Snapshot mit einer Nachricht."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
     if not index:
-        secho("[Forge] >> Keine Dateien für einen Snapshot.", fg="red", bold=True)
+        secho("[Forge] >> No Data for a Snapshot.", fg="red", bold=True)
         return
-    parent = f._read_head()
+    parent = f.read_head()
     commit_data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "message": message,
@@ -223,9 +198,9 @@ def commit(message):
     }
     # stabile Hash-Bildung
     commit_hash = hashlib.sha1(json.dumps(commit_data, sort_keys=True).encode("utf-8")).hexdigest()
-    f._write_commit(commit_hash, commit_data)
-    f._write_head(commit_hash)
-    secho(f"[Forge] >> Commit {commit_hash[:7]} gespeichert.", fg="green", bold=True)
+    f.write_commit(commit_hash, commit_data)
+    f.write_head(commit_hash)
+    secho(f"[Forge] >> Commit {commit_hash[:7]} saved.", fg="green", bold=True)
 
 # ... (vorheriger Code bleibt gleich)
 
@@ -234,7 +209,7 @@ def status():
     """Zeigt den aktuellen Zustand: staged, geändert, gelöscht, untracked."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
 
     staged = []
     modified = []
@@ -243,16 +218,16 @@ def status():
 
     # Check indexed files against working tree
     for rel, obj_hash in index.items():
-        abs_path = f._abspath(rel)
+        abs_path = abspath(rel)
         if not os.path.exists(abs_path):
             deleted.append(rel)
             continue
         try:
             with open(abs_path, 'rb') as fh:
                 data = fh.read()
-        except Exception:
+        except FileNotFoundError:
             continue
-        h = f._hash_bytes(data)
+        h = _hash_bytes(data)
         if h != obj_hash:
             modified.append(rel)
         else:
@@ -269,12 +244,12 @@ def status():
             path = os.path.join(root, name)
             if any(part.startswith('.') for part in path.split(os.sep)):
                 continue
-            rel = f._relpath(path)
+            rel = relpath(path)
             if rel not in index:
                 untracked.append(rel)
 
     if not any([staged, modified, deleted, untracked]):
-        secho("[Forge] >> Nichts zu tun. Arbeitsverzeichnis sauber.", fg="green", bold=True)
+        secho("[Forge] >> No Tasks. Directory is clean.", fg="green", bold=True)
         return
 
     if staged:
@@ -282,11 +257,11 @@ def status():
         for p in sorted(staged):
             secho(f"  {p}")
     if modified:
-        secho("Geändert:", fg='yellow', bold=True)
+        secho("Changed:", fg='yellow', bold=True)
         for p in sorted(modified):
             secho(f"  {p}")
     if deleted:
-        secho("Gelöscht:", fg='red', bold=True)
+        secho("Deleted:", fg='red', bold=True)
         for p in sorted(deleted):
             secho(f"  {p}")
     if untracked:
@@ -319,7 +294,7 @@ def push(remote_path):
             shutil.rmtree(dst)
         shutil.copytree(src, dst)
         
-    secho(f"[Forge] >> Repository erfolgreich nach {remote_path} geschoben.", fg="green", bold=True)
+    secho(f"[Forge] >> Repository successfully moved to {remote_path}", fg="green", bold=True)
 
 @cli.command()
 @click.argument('remote_path', type=click.Path(exists=True))
@@ -349,91 +324,22 @@ def pull(remote_path):
             if not os.path.exists(d):
                 shutil.copy2(s, d)
                 
-    secho("[Forge] >> Neue Daten erfolgreich gezogen.", fg="green", bold=True)
+    secho("[Forge] >> Neue Data successfully pulled.", fg="green", bold=True)
 
-@cli.command()
-@click.argument('message', type=str)
-def back(message):
-    """
-    Setze Repository auf Snapshot mit bestimmter Nachricht zurück.
-    """
-    f = Forge()
-    f.ensure_repo()
-
-    matches = []
-    for c_hash in os.listdir(f.commits_path):
-        data = f._read_commit(c_hash)
-        if not data:
-            continue
-        if message.lower() in data.get('message', '').lower():
-            ts = data.get('timestamp')
-            t = None
-            if ts:
-                # Try ISO format first (with optional timezone)
-                try:
-                    t = datetime.fromisoformat(ts)
-                except Exception:
-                    pass
-                if t is None:
-                    # Try legacy format without timezone
-                    try:
-                        t = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-                        # assume local timezone for legacy naive timestamps
-                        local_tz = datetime.now().astimezone().tzinfo
-                        t = t.replace(tzinfo=local_tz)
-                    except Exception:
-                        t = None
-                # Normalize to UTC
-                if t is not None:
-                    if t.tzinfo is None:
-                        local_tz = datetime.now().astimezone().tzinfo
-                        t = t.replace(tzinfo=local_tz)
-                    t = t.astimezone(timezone.utc)
-            if t is None:
-                # Fallback: use file modification time (as UTC)
-                mtime = os.path.getmtime(os.path.join(f.commits_path, c_hash))
-                t = datetime.fromtimestamp(mtime, tz=timezone.utc)
-            matches.append((t, c_hash, data))
-
-    if not matches:
-        secho(f"[Forge] >> Kein Snapshot mit Nachricht '{message}' gefunden.", fg="red", bold=True)
-        return
-
-    # Wähle den jüngsten passenden Commit
-    matches.sort(reverse=True)
-    chosen_time, chosen_hash, chosen_data = matches[0]
-
-    # Wiederherstellen der Dateien aus dem Commit
-    for rel_path, obj_hash in chosen_data.get('files', {}).items():
-        obj_file = os.path.join(f.objects_path, obj_hash)
-        if not os.path.exists(obj_file):
-            secho(f"[Forge] >> Objekt {obj_hash} für {rel_path} fehlt.", fg="red")
-            continue
-        abs_path = f._abspath(rel_path)
-        dir_name = os.path.dirname(abs_path)
-        if dir_name and not os.path.exists(dir_name):
-            os.makedirs(dir_name, exist_ok=True)
-        with open(obj_file, 'rb') as o, open(abs_path, 'wb') as out:
-            out.write(o.read())
-
-    # Index aktualisieren und HEAD setzen
-    f._save_index(chosen_data.get('files', {}))
-    f._write_head(chosen_hash)
-    secho(f"[Forge] >> Repository auf Snapshot {chosen_hash[:7]} ('{chosen_data.get('message', '')}') zurückgesetzt.", fg="green", bold=True)
 
 @cli.command()
 def log():
     """Listet die Commit-Historie entlang von HEAD (jüngster zuerst)."""
     f = Forge()
     f.ensure_repo()
-    head = f._read_head()
+    head = f.read_head()
 
     chain = []
     visited = set()
     current = head
     while current and current not in visited:
         visited.add(current)
-        data = f._read_commit(current)
+        data = f.read_commit(current)
         if not data:
             break
         chain.append((current, data))
@@ -445,15 +351,15 @@ def log():
         if not commits:
             secho("[Forge] >> Keine Snapshots vorhanden.", fg="red", bold=True)
             return
-        secho("--- Snapshots (unsortiert) ---", fg="green")
+        secho("--- Snapshots ---", fg="green")
         for c_hash in sorted(commits, reverse=True):
-            data = f._read_commit(c_hash)
+            data = f.read_commit(c_hash)
             if not data:
                 continue
             secho(f"[{c_hash[:7]}] {data.get('timestamp','?')} | {data.get('message','')}" , fg="blue", bold=True)
         return
 
-    secho("--- Historie (HEAD → …) ---", fg="green", bold=True)
+    secho("--- Historie ---", fg="green", bold=True)
     for c_hash, data in chain:
         secho(f"[{c_hash[:7]}] {data.get('timestamp','?')} | {data.get('message','')}", fg="blue", bold=True)
 
@@ -474,40 +380,40 @@ def tag(name, commit, delete, list_tags):
     if list_tags:
         tags = sorted(os.listdir(f.tags_path))
         if not tags:
-            secho("Keine Tags vorhanden.", fg='yellow')
+            secho("No Tags exists.", fg='yellow')
             return
         for t in tags:
             path = os.path.join(f.tags_path, t)
             try:
                 with open(path, 'r', encoding='utf-8') as fh:
                     h = fh.read().strip()
-            except Exception:
+            except FileNotFoundError as e:
                 h = '?'
             secho(f"{t} -> {h}")
         return
     if delete:
         if not name:
-            secho('Bitte Tag-Namen angeben zum Löschen.', fg='red')
+            secho('Please enter Tag-Name to delete.', fg='red')
             return
         p = os.path.join(f.tags_path, name)
         if os.path.exists(p):
             os.remove(p)
-            secho(f"Tag '{name}' gelöscht.", fg='green')
+            secho(f"Tag '{name}' deleted.", fg='green')
         else:
-            secho(f"Tag '{name}' nicht gefunden.", fg='yellow')
+            secho(f"Tag '{name}' not found", fg='yellow')
         return
     # create tag
     if not name:
-        secho('Bitte Tag-Namen angeben.', fg='red')
+        secho('Please enter Tag-Name', fg='red')
         return
-    target = commit or f._read_head()
+    target = commit or f.read_head()
     if not target:
-        secho('Kein Ziel-Commit (HEAD) vorhanden.', fg='red')
+        secho('No Commit (HEAD) exists.', fg='red')
         return
     p = os.path.join(f.tags_path, name)
     with open(p, 'w', encoding='utf-8') as fh:
         fh.write(target + '\n')
-    secho(f"Tag '{name}' auf {target[:7]} gesetzt.", fg='green')
+    secho(f"Tag '{name}' to {target[:7]} set", fg='green')
 
 @cli.command()
 @click.argument('name', required=False)
@@ -532,10 +438,10 @@ def branch(name, create, delete, checkout, list_branches):
         try:
             with open(head_branch_file, 'r', encoding='utf-8') as fh:
                 current = fh.read().strip() or None
-        except Exception:
+        except FileNotFoundError:
             current = None
         if not branches:
-            secho('Keine Branches vorhanden.', fg='yellow')
+            secho('No Branches exists.', fg='yellow')
             return
         for b in branches:
             mark = '*' if b == current else ' '
@@ -543,33 +449,33 @@ def branch(name, create, delete, checkout, list_branches):
             try:
                 with open(p, 'r', encoding='utf-8') as fh:
                     h = fh.read().strip()
-            except Exception:
+            except FileNotFoundError:
                 h = '?'
             secho(f"{mark} {b} -> {h}")
         return
     if delete:
         if not name:
-            secho('Bitte Branch-Namen zum Löschen angeben.', fg='red')
+            secho('Please enter Branch-Name to delete.', fg='red')
             return
         p = os.path.join(f.branches_path, name)
         if os.path.exists(p):
             os.remove(p)
-            secho(f"Branch '{name}' gelöscht.", fg='green')
+            secho(f"Branch '{name}' deleted.", fg='green')
         else:
-            secho(f"Branch '{name}' nicht gefunden.", fg='yellow')
+            secho(f"Branch '{name}' not found.", fg='yellow')
         return
     if create:
         if not name:
-            secho('Bitte Branch-Namen zum Erstellen angeben.', fg='red')
+            secho('Please enter Branch-Name to create', fg='red')
             return
-        target = f._read_head()
+        target = f.read_head()
         if not target:
-            secho('Kein HEAD-Commit zum Verweisen.', fg='red')
+            secho('No HEAD-Commit to commit.', fg='red')
             return
         p = os.path.join(f.branches_path, name)
         with open(p, 'w', encoding='utf-8') as fh:
             fh.write(target + '\n')
-        secho(f"Branch '{name}' auf {target[:7]} erstellt.", fg='green')
+        secho(f"Branch '{name}' on {target[:7]} created", fg='green')
         return
     if checkout:
         if not name:
@@ -577,26 +483,26 @@ def branch(name, create, delete, checkout, list_branches):
             return
         p = os.path.join(f.branches_path, name)
         if not os.path.exists(p):
-            secho(f"Branch '{name}' nicht gefunden.", fg='red')
+            secho(f"Branch '{name}' not found.", fg='red')
             return
         with open(p, 'r', encoding='utf-8') as fh:
             target = fh.read().strip()
         if not target:
-            secho('Branch hat keinen Ziel-Commit.', fg='red')
+            secho('Branch has no Commit.', fg='red')
             return
-        f._write_head(target)
+        f.write_head(target)
         with open(head_branch_file, 'w', encoding='utf-8') as fh:
             fh.write(name + '\n')
-        secho(f"Gewechselt zu Branch '{name}' ({target[:7]}).", fg='green')
+        secho(f"Switch to Branch '{name}' ({target[:7]}).", fg='green')
         return
     # Default: show hint
-    secho('Bitte Aktion wählen: --list, --create, --delete, --checkout', fg='yellow')
+    secho('Use Actions: --list, --create, --delete, --checkout', fg='yellow')
 
 
 @cli.command()
-@click.option('--yes', is_flag=True, help='Bestätige ohne Nachfrage')
-@click.option('--dry-run', is_flag=True, help='Zeige, was gelöscht würde, führe aber nichts aus')
-@click.option('--backup-dir', type=click.Path(), help='Optionales Verzeichnis zum Sichern des aktuellen .forge')
+@click.option('--yes', is_flag=True, help='Submit')
+@click.option('--dry-run', is_flag=True, help='Show deleted Files')
+@click.option('--backup-dir', type=click.Path(), help='Optional Directory to backup .forge')
 def reset(yes, dry_run, backup_dir):
     """Löscht das lokale Forge-Repository (`.forge`) komplett und initialisiert es neu.
 
@@ -604,7 +510,7 @@ def reset(yes, dry_run, backup_dir):
     """
     f = Forge()
     if not os.path.exists(f.base_path):
-        secho('Kein Repository vorhanden.', fg='yellow')
+        secho('No Repositorys found.', fg='yellow')
         return
 
     to_remove = [f.objects_path, f.commits_path, f.index_path, f.head_path, f.tags_path, f.branches_path]
@@ -617,28 +523,28 @@ def reset(yes, dry_run, backup_dir):
 
     if not yes:
         if QUIET:
-            secho('Abgebrochen: benutze --yes, um ohne Nachfrage zu bestätigen.', fg='red')
+            secho('Aborted: use --yes, to submit the query.', fg='red')
             return
-        if not click.confirm('Achtung: Alle Repository-Daten in .forge werden gelöscht. Fortfahren?'):
-            secho('Abgebrochen.', fg='yellow')
+        if not click.confirm('Attention: All Repository-Data in .forge delete. Continue?'):
+            secho('Aborted.', fg='yellow')
             return
 
     if backup_dir:
         if os.path.exists(backup_dir):
-            secho(f'Backup-Ziel {backup_dir} existiert bereits.', fg='red')
+            secho(f'Backup on {backup_dir} already exists', fg='red')
             return
         try:
             shutil.copytree(f.base_path, backup_dir)
-            secho(f'Backup von {f.base_path} nach {backup_dir} erstellt.', fg='green')
+            secho(f'Backup from {f.base_path} to {backup_dir} created', fg='green')
         except Exception as e:
-            secho(f'Fehler beim Erstellen des Backups: {e}', fg='red')
+            secho(f'Error when create Backups: {e}', fg='red')
             return
 
     # Entferne das Repository-Verzeichnis komplett und initialisiere neu
     try:
         shutil.rmtree(f.base_path)
     except Exception as e:
-        secho(f'Fehler beim Löschen von {f.base_path}: {e}', fg='red')
+        secho(f'Error when delete {f.base_path}: {e}', fg='red')
         return
 
     # Neu anlegen
@@ -648,45 +554,45 @@ def reset(yes, dry_run, backup_dir):
     # create empty HEAD and index
     with open(f.head_path, 'w', encoding='utf-8') as _:
         _.write('')
-    f._save_index({})
-    secho('Repository zurückgesetzt und neu initialisiert.', fg='green')
+    f.save_index({})
+    secho('Repository restored and initalized', fg='green')
 
 
 @cli.command()
-@click.option('--cached', is_flag=True, help='Nur aus dem Index entfernen, Dateien nicht löschen')
+@click.option('--cached', is_flag=True, help='Remove from Index, not from Disk')
 @click.argument('paths', nargs=-1, type=click.Path())
 def rm(cached, paths):
     """Entfernt Dateien aus dem Index und optional vom Dateisystem."""
     f = Forge()
     f.ensure_repo()
     if not paths:
-        secho("[Forge] >> Keine Pfade angegeben.", fg='red', bold=True)
+        secho("[Forge] >> No Path", fg='red', bold=True)
         return
-    index = f._get_index()
+    index = f.get_index()
     removed = 0
     for p in paths:
-        rel = f._relpath(p)
+        rel = relpath(p)
         if rel in index:
             del index[rel]
             removed += 1
             if not cached:
-                abs_p = f._abspath(rel)
+                abs_p = abspath(rel)
                 if os.path.exists(abs_p) and os.path.isfile(abs_p):
                     try:
                         os.remove(abs_p)
                     except Exception as e:
-                        secho(f"[Forge] >> Konnte {abs_p} nicht löschen: {e}", fg='red')
+                        secho(f"[Forge] >> Cannot {abs_p} delete {e}", fg='red')
         else:
-            secho(f"[Forge] >> {rel} nicht im Index.", fg='yellow')
-    f._save_index(index)
-    secho(f"[Forge] >> {removed} Pfad(e) entfernt.", fg='green', bold=True)
+            secho(f"[Forge] >> {rel} not in Index.", fg='yellow')
+    f.save_index(index)
+    secho(f"[Forge] >> {removed} Path(s) removed", fg='green', bold=True)
 
 
 def _is_text_bytes(b: bytes) -> bool:
     try:
         b.decode('utf-8')
         return True
-    except Exception:
+    except Exception as e:
         return False
 
 
@@ -697,14 +603,14 @@ def restore(restore_all, paths):
     """Stellt Dateien aus dem Index wieder her (aus Objekten)."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
 
     targets = []
     if restore_all or not paths:
         targets = list(index.keys())
     else:
         for p in paths:
-            rel = f._relpath(p)
+            rel = relpath(p)
             if rel in index:
                 targets.append(rel)
             else:
@@ -717,14 +623,14 @@ def restore(restore_all, paths):
             continue
         obj_file = os.path.join(f.objects_path, obj_hash)
         if not os.path.exists(obj_file):
-            secho(f"[Forge] >> Objekt {obj_hash} fehlt für {rel}.", fg='red')
+            secho(f"[Forge] >> Object {obj_hash} not found for {rel}.", fg='red')
             continue
-        abs_path = f._abspath(rel)
+        abs_path = abspath(rel)
         os.makedirs(os.path.dirname(abs_path) or '.', exist_ok=True)
         with open(obj_file, 'rb') as src, open(abs_path, 'wb') as dst:
             dst.write(src.read())
         restored += 1
-    secho(f"[Forge] >> {restored} Datei(en) wiederhergestellt.", fg='green', bold=True)
+    secho(f"[Forge] >> {restored} Data restored", fg='green', bold=True)
 
 
 @cli.command()
@@ -733,10 +639,10 @@ def diff(paths):
     """Zeigt Unterschiede zwischen Arbeitsverzeichnis und Index."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
 
     def show_diff_for(rel):
-        abs_path = f._abspath(rel)
+        abs_path = abspath(rel)
         obj_hash = index.get(rel)
         if obj_hash is None:
             # untracked: show as added
@@ -745,7 +651,7 @@ def diff(paths):
             with open(abs_path, 'rb') as fh:
                 b = fh.read()
             if not _is_text_bytes(b):
-                secho(f"Binary file {rel} differs (untracked)", fg='yellow')
+                secho(f"Binary File {rel}", fg='yellow')
                 return
             text = b.decode('utf-8', errors='replace').splitlines(keepends=False)
             ud = difflib.unified_diff([], text, fromfile=f"a/{rel}", tofile=f"b/{rel}")
@@ -753,7 +659,7 @@ def diff(paths):
             return
         obj_file = os.path.join(f.objects_path, obj_hash)
         if not os.path.exists(obj_file):
-            secho(f"[Forge] >> Objekt {obj_hash} fehlt für {rel}.", fg='red')
+            secho(f"[Forge] >> Object {obj_hash} not found for {rel}.", fg='red')
             return
         with open(obj_file, 'rb') as fh:
             ob = fh.read()
@@ -764,13 +670,13 @@ def diff(paths):
                 ud = difflib.unified_diff(a, [], fromfile=f"a/{rel}", tofile=f"b/{rel}")
                 click.echo('\n'.join(ud))
             else:
-                secho(f"Binary file {rel} deleted", fg='yellow')
+                secho(f"Binary File {rel} deleted", fg='yellow')
             return
         with open(abs_path, 'rb') as fh:
             wb = fh.read()
         if not _is_text_bytes(ob) or not _is_text_bytes(wb):
             if ob != wb:
-                secho(f"Binary file {rel} differs", fg='yellow')
+                secho(f"Binary File {rel} differs", fg='yellow')
             return
         a = ob.decode('utf-8', errors='replace').splitlines(False)
         b = wb.decode('utf-8', errors='replace').splitlines(False)
@@ -780,7 +686,7 @@ def diff(paths):
         click.echo('\n'.join(ud))
 
     if paths:
-        rels = [f._relpath(p) for p in paths]
+        rels = [relpath(p) for p in paths]
     else:
         # default: all indexed files
         rels = sorted(set(list(index.keys())))
@@ -793,7 +699,7 @@ def diff(paths):
                 p = os.path.join(root, name)
                 if f.base_path in p:
                     continue
-                rels.append(f._relpath(p))
+                rels.append(relpath(p))
         rels = sorted(set(rels))
 
     for rel in rels:
@@ -807,27 +713,28 @@ def show(object_hash, path_arg):
     """Zeigt Inhalt eines Objekts oder eines indexierten Pfads (Textdateien)."""
     f = Forge()
     f.ensure_repo()
-    index = f._get_index()
+    index = f.get_index()
 
     if object_hash:
         obj_file = os.path.join(f.objects_path, object_hash)
         if not os.path.exists(obj_file):
-            secho(f"[Forge] >> Objekt {object_hash} nicht gefunden.", fg='red')
-            return
+            secho(f"[Forge] >> {object_hash} not found", fg='red')
+            return None
         with open(obj_file, 'rb') as fh:
             b = fh.read()
         if _is_text_bytes(b):
             click.echo(b.decode('utf-8', errors='replace'))
         else:
-            secho("[Forge] >> Binärdaten (nicht dargestellt)", fg='yellow')
-        return
+            secho("[Forge] >> Binary Data", fg='yellow')
+        return None
 
     if path_arg:
-        rel = f._relpath(path_arg)
+        rel = relpath(path_arg)
         obj_hash = index.get(rel)
         if not obj_hash:
-            secho(f"[Forge] >> {rel} nicht im Index.", fg='red')
-            return
+            secho(f"[Forge] >> {rel} not in Index.", fg='red')
+            return None
         return show.callback(object_hash=obj_hash, path_arg=None)  # reuse
 
-    secho("[Forge] >> Bitte --object HASH oder --path DATEI angeben.", fg='yellow')
+    secho("[Forge] >> Use --object or --path", fg='yellow')
+    return None
