@@ -1,0 +1,10 @@
+{
+  "files": {
+    "README.md": "3abc4973fbae2896069be2d94af1b8aadab96f05",
+    "pyproject.toml": "b26d7b7c87d4478d061af223cadcc271f6d971e5",
+    "src/forge/forge.py": "b146f26d17b556db46c8f3017033598e5bd27112"
+  },
+  "message": "beta",
+  "parent": "67cee07b33e6e29da35416c35381067d579c7f98",
+  "timestamp": "2026-02-09 14:57:26"
+}
