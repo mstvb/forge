@@ -2,10 +2,8 @@
 
 Forge requires Python 3.12 or newer.
 
-Install in editable (development) mode from the project root:
-
 ```
-pip install --user --editable .
+pip install .
 ```
 
 This will install the `forge` command.
