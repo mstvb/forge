@@ -1,0 +1,46 @@
+name: Bug report
+description: Report an Bug | Error
+labels: ["troubleshooting"]
+assignees: ["mstvb"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Bug | Error**
+
+  - type: textarea
+    attributes:
+      label: Summary
+      description: |
+        A Description of this Bug | Error.
+
+        Please include the full output of uv with the complete error message.
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: OS System
+      description: What is your Operating System?
+      options:
+        - Windows
+        - Linux
+        - MacOS
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: OS Version
+      description: What is the Version of your Operating System?
+      placeholder: Version of your OS
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Python Version
+      description: What is your Python Version?
+      placeholder: Python Version
+    validations:
+      required: true

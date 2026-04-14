@@ -25,3 +25,10 @@
 
   > Use `numpydoc` as Code Style 
 
+#### Links
+
+> [Bug Report](/.github/ISSUE_TEMPLATE/1_bug_report.yaml)
+
+> [Feature Request](/.github/ISSUE_TEMPLATE/2_feature_request.yaml)
+
+> [Code Style](https://numpydoc.readthedocs.io/en/latest/format.html)
