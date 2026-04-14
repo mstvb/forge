@@ -106,7 +106,7 @@ class Forge:
 # --- CLI Definition mit Click ---
 
 @click.group()
-@click.option('--quiet', '-q', is_flag=True, help='Suppress non-essential output')
+@click.option('--quiet', '-q', is_flag=True, help='suppress non-essential output')
 @click.pass_context
 def cli(ctx, quiet):
     """Forge - Version Control"""
@@ -132,7 +132,7 @@ def init():
         secho("[Forge] >> Repository successfully initialized", fg="green", bold=True)
 
 @cli.command()
-@click.option('--all', 'add_all', is_flag=True, help='All Data added')
+@click.option('--all', 'add_all', is_flag=True, help='all data added')
 @click.argument('files', nargs=-1, type=click.Path(exists=True))
 def add(add_all, files):
     """Fügt Dateien zum Repository hinzu."""
@@ -324,7 +324,7 @@ def pull(remote_path):
             if not os.path.exists(d):
                 shutil.copy2(s, d)
                 
-    secho("[Forge] >> Neue Data successfully pulled.", fg="green", bold=True)
+    secho("[Forge] >> New Data successfully pulled.", fg="green", bold=True)
 
 
 @cli.command()
@@ -349,7 +349,7 @@ def log():
         # Fallback: keine HEAD gesetzt, zeige vorhandene Commits unsortiert
         commits = os.listdir(f.commits_path) if os.path.exists(f.commits_path) else []
         if not commits:
-            secho("[Forge] >> Keine Snapshots vorhanden.", fg="red", bold=True)
+            secho("[Forge] >> No Snapshots exist", fg="red", bold=True)
             return
         secho("--- Snapshots ---", fg="green")
         for c_hash in sorted(commits, reverse=True):
@@ -366,8 +366,8 @@ def log():
 @cli.command()
 @click.argument('name', required=False)
 @click.argument('commit', required=False)
-@click.option('-d', '--delete', is_flag=True, help='Lösche einen Tag')
-@click.option('-l', '--list', 'list_tags', is_flag=True, help='Zeige alle Tags')
+@click.option('-d', '--delete', is_flag=True, help='delete a tag')
+@click.option('-l', '--list', 'list_tags', is_flag=True, help='show all tags')
 def tag(name, commit, delete, list_tags):
     """Erzeuge, lösche oder zeige Tags (Release-Tags).
 
@@ -417,10 +417,10 @@ def tag(name, commit, delete, list_tags):
 
 @cli.command()
 @click.argument('name', required=False)
-@click.option('-c', '--create', 'create', is_flag=True, help='Erstelle einen neuen Branch')
-@click.option('-d', '--delete', 'delete', is_flag=True, help='Lösche einen Branch')
-@click.option('-C', '--checkout', 'checkout', is_flag=True, help='Wechsle zu Branch')
-@click.option('-l', '--list', 'list_branches', is_flag=True, help='Zeige Branches')
+@click.option('-c', '--create', 'create', is_flag=True, help='create new branch')
+@click.option('-d', '--delete', 'delete', is_flag=True, help='delete a branch')
+@click.option('-C', '--checkout', 'checkout', is_flag=True, help='switch to branch')
+@click.option('-l', '--list', 'list_branches', is_flag=True, help='show branches')
 def branch(name, create, delete, checkout, list_branches):
     """Branch-Verwaltung: create/list/delete/checkout.
 
@@ -479,7 +479,7 @@ def branch(name, create, delete, checkout, list_branches):
         return
     if checkout:
         if not name:
-            secho('Bitte Branch-Namen zum Wechseln angeben.', fg='red')
+            secho('Please enter Branch-Name to checkout.', fg='red')
             return
         p = os.path.join(f.branches_path, name)
         if not os.path.exists(p):
@@ -500,9 +500,9 @@ def branch(name, create, delete, checkout, list_branches):
 
 
 @cli.command()
-@click.option('--yes', is_flag=True, help='Submit')
-@click.option('--dry-run', is_flag=True, help='Show deleted Files')
-@click.option('--backup-dir', type=click.Path(), help='Optional Directory to backup .forge')
+@click.option('--yes', is_flag=True, help='submit')
+@click.option('--dry-run', is_flag=True, help='show deleted files')
+@click.option('--backup-dir', type=click.Path(), help='optional directory to backup .forge')
 def reset(yes, dry_run, backup_dir):
     """Löscht das lokale Forge-Repository (`.forge`) komplett und initialisiert es neu.
 
@@ -516,7 +516,7 @@ def reset(yes, dry_run, backup_dir):
     to_remove = [f.objects_path, f.commits_path, f.index_path, f.head_path, f.tags_path, f.branches_path]
 
     if dry_run:
-        secho('Dry run — folgende Pfade würden entfernt:', fg='yellow')
+        secho('Dry run — removed paths:', fg='yellow')
         for p in to_remove:
             secho(f' - {p}')
         return
@@ -559,7 +559,7 @@ def reset(yes, dry_run, backup_dir):
 
 
 @cli.command()
-@click.option('--cached', is_flag=True, help='Remove from Index, not from Disk')
+@click.option('--cached', is_flag=True, help='remove from Index, not from disk')
 @click.argument('paths', nargs=-1, type=click.Path())
 def rm(cached, paths):
     """Entfernt Dateien aus dem Index und optional vom Dateisystem."""
@@ -597,7 +597,7 @@ def _is_text_bytes(b: bytes) -> bool:
 
 
 @cli.command()
-@click.option('--all', 'restore_all', is_flag=True, help='Alle indexierten Dateien wiederherstellen')
+@click.option('--all', 'restore_all', is_flag=True, help='all indexed files restored')
 @click.argument('paths', nargs=-1, type=click.Path())
 def restore(restore_all, paths):
     """Stellt Dateien aus dem Index wieder her (aus Objekten)."""
@@ -614,7 +614,7 @@ def restore(restore_all, paths):
             if rel in index:
                 targets.append(rel)
             else:
-                secho(f"[Forge] >> {rel} nicht im Index.", fg='yellow')
+                secho(f"[Forge] >> {rel} not in Index.", fg='yellow')
 
     restored = 0
     for rel in targets:
@@ -707,8 +707,8 @@ def diff(paths):
 
 
 @cli.command()
-@click.option('--object', 'object_hash', help='Objekt-Hash anzeigen')
-@click.option('--path', 'path_arg', type=click.Path(), help='Inhalt eines indexierten Pfads anzeigen')
+@click.option('--object', 'object_hash', help='shows content of an object by hash')
+@click.option('--path', 'path_arg', type=click.Path(), help='shows content of an object by indexed path')
 def show(object_hash, path_arg):
     """Zeigt Inhalt eines Objekts oder eines indexierten Pfads (Textdateien)."""
     f = Forge()
