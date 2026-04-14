@@ -42,6 +42,7 @@ pip install .
 - [RM](/docs/commands/rm.md) - Remove Files
 - [SHOW](/docs/commands/show.md) - Display Content
 - [STATUS](/docs/commands/status.md) - List >> [ Staged | Changed | Deleted | Untracked ] Files
+- [TAG](/docs/commands/tag.md) - Tags 
 
 ## Project Links
 

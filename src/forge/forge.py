@@ -5,7 +5,7 @@ import json
 import click
 import shutil
 import difflib
-from datetime import datetime, timezone
+from datetime import datetime
 
 # Global quiet flag controlled by CLI
 QUIET = False
@@ -135,7 +135,7 @@ def init():
 @click.option('--all', 'add_all', is_flag=True, help='all data added')
 @click.argument('files', nargs=-1, type=click.Path(exists=True))
 def add(add_all, files):
-    """Fügt Dateien zum Repository hinzu."""
+    """Add Files to Repository (Index)."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
@@ -182,7 +182,7 @@ def add(add_all, files):
 @cli.command()
 @click.argument('message', type=str, required=True)
 def commit(message):
-    """Erstellt einen Snapshot mit einer Nachricht."""
+    """Creates a Snapshot with a message."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
@@ -206,7 +206,7 @@ def commit(message):
 
 @cli.command()
 def status():
-    """Zeigt den aktuellen Zustand: staged, geändert, gelöscht, untracked."""
+    """Shows the current state: staged, changed, deleted, untracked."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
@@ -272,9 +272,9 @@ def status():
 @cli.command()
 @click.argument('remote_path', type=click.Path())
 def push(remote_path):
-    """Überträgt alle Daten in ein Remote-Verzeichnis.
+    """Share files to Remote-Repository (e.g. on a shared drive).
 
-    Robustheit: überspringt fehlende lokale Ordner (z. B. wenn keine Objekte vorhanden sind)."""
+    Durability: all objects and commits are copied to the remote, but local repository remains unchanged."""
     f = Forge()
     f.ensure_repo()
     
@@ -300,7 +300,7 @@ def push(remote_path):
 @click.argument('remote_path', type=click.Path(exists=True))
 def pull(remote_path):
     """
-    Hole Dateien aus Remote-Repository
+    Pull files from Remote-Repository (e.g. on a shared drive) to local.
     """
     f = Forge()
     f.ensure_repo()
@@ -329,7 +329,7 @@ def pull(remote_path):
 
 @cli.command()
 def log():
-    """Listet die Commit-Historie entlang von HEAD (jüngster zuerst)."""
+    """List the Commit-History along HEAD (latest first)."""
     f = Forge()
     f.ensure_repo()
     head = f.read_head()
@@ -369,10 +369,10 @@ def log():
 @click.option('-d', '--delete', is_flag=True, help='delete a tag')
 @click.option('-l', '--list', 'list_tags', is_flag=True, help='show all tags')
 def tag(name, commit, delete, list_tags):
-    """Erzeuge, lösche oder zeige Tags (Release-Tags).
+    """Create, delete or show tags (Release-Tags).
 
-    Ohne Optionen listet `tag` alle vorhandenen Tags. Mit `name` wird ein Tag
-    erstellt, standardmäßig auf den aktuellen HEAD.
+    Without options `tag` lists all available tags. With `name` a tag is created,
+    defaulting to the current HEAD.
     """
     f = Forge()
     f.ensure_repo()
@@ -422,11 +422,11 @@ def tag(name, commit, delete, list_tags):
 @click.option('-C', '--checkout', 'checkout', is_flag=True, help='switch to branch')
 @click.option('-l', '--list', 'list_branches', is_flag=True, help='show branches')
 def branch(name, create, delete, checkout, list_branches):
-    """Branch-Verwaltung: create/list/delete/checkout.
+    """Branch-Management: create/list/delete/checkout.
 
-    Branches sind einfache Zeiger auf einen Commit-Hash in `.forge/branches/`.
-    Checkout setzt den `HEAD` auf den Commit des Branches und speichert den
-    aktuellen Branchnamen in `.forge/HEAD_BRANCH`.
+    Branches are simple pointers to commits. With `--create` a new branch is created at the current HEAD.
+     `--checkout` switches HEAD to the branch. `--delete` removes a branch.
+     Without options `branch` lists all available branches, marking the current one with `*`.
     """
     f = Forge()
     f.ensure_repo()
@@ -504,9 +504,10 @@ def branch(name, create, delete, checkout, list_branches):
 @click.option('--dry-run', is_flag=True, help='show deleted files')
 @click.option('--backup-dir', type=click.Path(), help='optional directory to backup .forge')
 def reset(yes, dry_run, backup_dir):
-    """Löscht das lokale Forge-Repository (`.forge`) komplett und initialisiert es neu.
+    """Delete Repository Data and initialize new Repository.
 
-    Achtung: destruktiv — alle Commits, Objekte, Tags und Branches werden entfernt.
+    Attention: All Repository-Data in .forge delete. 
+    Use with --dry-run to show deleted files or --backup-dir to backup before delete.
     """
     f = Forge()
     if not os.path.exists(f.base_path):
@@ -562,7 +563,7 @@ def reset(yes, dry_run, backup_dir):
 @click.option('--cached', is_flag=True, help='remove from Index, not from disk')
 @click.argument('paths', nargs=-1, type=click.Path())
 def rm(cached, paths):
-    """Entfernt Dateien aus dem Index und optional vom Dateisystem."""
+    """Remove files from the index and optionally from the filesystem."""
     f = Forge()
     f.ensure_repo()
     if not paths:
@@ -600,7 +601,7 @@ def _is_text_bytes(b: bytes) -> bool:
 @click.option('--all', 'restore_all', is_flag=True, help='all indexed files restored')
 @click.argument('paths', nargs=-1, type=click.Path())
 def restore(restore_all, paths):
-    """Stellt Dateien aus dem Index wieder her (aus Objekten)."""
+    """Restore files from the index (from objects)."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
@@ -636,7 +637,7 @@ def restore(restore_all, paths):
 @cli.command()
 @click.argument('paths', nargs=-1, type=click.Path())
 def diff(paths):
-    """Zeigt Unterschiede zwischen Arbeitsverzeichnis und Index."""
+    """Shows differences between working directory and index."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
@@ -710,7 +711,7 @@ def diff(paths):
 @click.option('--object', 'object_hash', help='shows content of an object by hash')
 @click.option('--path', 'path_arg', type=click.Path(), help='shows content of an object by indexed path')
 def show(object_hash, path_arg):
-    """Zeigt Inhalt eines Objekts oder eines indexierten Pfads (Textdateien)."""
+    """Shows content of an object or an indexed path (text files)."""
     f = Forge()
     f.ensure_repo()
     index = f.get_index()
