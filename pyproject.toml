@@ -15,5 +15,4 @@ forge = 'forge.forge:cli'
 dev = [
     "ruff>=0.15.0",
     "ty>=0.0.14",
-    "pytest>=8.0"
 ]

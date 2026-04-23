@@ -5,6 +5,7 @@ Local Version Control
 ## Contents
 
 - [Installation](#installation)
+- [Commands](#commands)
 - [Project Links](#project-links)
 - [Authors](#authors)
 
@@ -30,19 +31,21 @@ pip install .
 
 ## Commands
 
-- [ADD](/docs/commands/add.md) - Add Files
-- [BACK](/docs/commands/back.md) - Restore to last Snapshot (Commit)
-- [COMMIT](/docs/commands/commit.md) - Commit Version
-- [DIFF](/docs/commands/diff.md) - Show Difference 
-- [INIT](/docs/commands/init.md) - Initalize Version Control
-- [LOG](/docs/commands/log.md) - List History
-- [PULL](/docs/commands/pull.md) - Copy Repository Data from other Drive
-- [PUSH](/docs/commands/push.md) - Copy Repository to new Destination
-- [RESTORE](/docs/commands/restore.md) - Restore Files 
-- [RM](/docs/commands/rm.md) - Remove Files
-- [SHOW](/docs/commands/show.md) - Display Content
-- [STATUS](/docs/commands/status.md) - List >> [ Staged | Changed | Deleted | Untracked ] Files
-- [TAG](/docs/commands/tag.md) - Tags 
+- ADD - Add Files
+- BACK - Restore to last Snapshot (Commit)
+- COMMIT - Commit Version
+- DIFF - Show Difference 
+- INIT - Initalize Version Control
+- LOG - List History
+- PULL - Copy Repository Data from other Drive
+- PUSH - Copy Repository to new Destination
+- RESTORE - Restore Files 
+- RM - Remove Files
+- SHOW - Display Content
+- STATUS - List >> [ Staged | Changed | Deleted | Untracked ] Files
+- TAG - Tags 
+- RESET - Reset Forge
+- BRANCH - Branches
 
 ## Project Links
 

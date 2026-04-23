@@ -120,7 +120,7 @@ def init():
     """Initialisiert eines neuen Repository."""
     f = Forge()
     if os.path.exists(f.base_path):
-        secho("[Forge] >> Repository already exists", fg="red", bold=True)
+        secho("[Forge] >> Repository already exists", fg="yellow", bold=True)
 
     else:
         for path in [f.base_path, f.objects_path, f.commits_path, f.tags_path, f.branches_path]:
@@ -180,7 +180,7 @@ def add(add_all, files):
     secho(f"[Forge] >> {added} Data added", fg="green", bold=True)
 
 @cli.command()
-@click.argument('message', type=str, required=True)
+@click.argument('--msg', 'message', type=str, required=True)
 def commit(message):
     """Creates a Snapshot with a message."""
     f = Forge()
@@ -215,6 +215,8 @@ def status():
     modified = []
     deleted = []
     untracked = []
+
+    secho("--- Show Status ---", fg="green", bold=True)
 
     # Check indexed files against working tree
     for rel, obj_hash in index.items():
@@ -351,7 +353,7 @@ def log():
         if not commits:
             secho("[Forge] >> No Snapshots exist", fg="red", bold=True)
             return
-        secho("--- Snapshots ---", fg="green")
+        secho("--- Snapshots ---", fg="green", bold=True)
         for c_hash in sorted(commits, reverse=True):
             data = f.read_commit(c_hash)
             if not data:
@@ -366,8 +368,8 @@ def log():
 @cli.command()
 @click.argument('name', required=False)
 @click.argument('commit', required=False)
-@click.option('-d', '--delete', is_flag=True, help='delete a tag')
-@click.option('-l', '--list', 'list_tags', is_flag=True, help='show all tags')
+@click.option('--delete', is_flag=True, help='Delete a Tag')
+@click.option('--list', 'list_tags', is_flag=True, help='List all Tags')
 def tag(name, commit, delete, list_tags):
     """Create, delete or show tags (Release-Tags).
 
@@ -393,34 +395,34 @@ def tag(name, commit, delete, list_tags):
         return
     if delete:
         if not name:
-            secho('Please enter Tag-Name to delete.', fg='red')
+            secho('Please enter Tag-Name to delete.', fg='red', bold=True)
             return
         p = os.path.join(f.tags_path, name)
         if os.path.exists(p):
             os.remove(p)
-            secho(f"Tag '{name}' deleted.", fg='green')
+            secho(f"Tag '{name}' deleted.", fg='red', bold=True)
         else:
-            secho(f"Tag '{name}' not found", fg='yellow')
+            secho(f"Tag '{name}' not found", fg='red', bold=True)
         return
     # create tag
     if not name:
-        secho('Please enter Tag-Name', fg='red')
+        secho('Please enter Tag-Name', fg='green', bold=True)
         return
     target = commit or f.read_head()
     if not target:
-        secho('No Commit (HEAD) exists.', fg='red')
+        secho('No Commit (HEAD) exists.', fg='red', bold=True)
         return
     p = os.path.join(f.tags_path, name)
     with open(p, 'w', encoding='utf-8') as fh:
         fh.write(target + '\n')
-    secho(f"Tag '{name}' to {target[:7]} set", fg='green')
+    secho(f"Tag '{name}' to {target[:7]} set", fg='green', bold=True)
 
 @cli.command()
 @click.argument('name', required=False)
-@click.option('-c', '--create', 'create', is_flag=True, help='create new branch')
-@click.option('-d', '--delete', 'delete', is_flag=True, help='delete a branch')
-@click.option('-C', '--checkout', 'checkout', is_flag=True, help='switch to branch')
-@click.option('-l', '--list', 'list_branches', is_flag=True, help='show branches')
+@click.option('--create', 'create', is_flag=True, help='create new branch')
+@click.option('--delete', 'delete', is_flag=True, help='delete a branch')
+@click.option('--checkout', 'checkout', is_flag=True, help='switch to branch')
+@click.option('--list', 'list_branches', is_flag=True, help='show branches')
 def branch(name, create, delete, checkout, list_branches):
     """Branch-Management: create/list/delete/checkout.
 
@@ -441,7 +443,7 @@ def branch(name, create, delete, checkout, list_branches):
         except FileNotFoundError:
             current = None
         if not branches:
-            secho('No Branches exists.', fg='yellow')
+            secho('No Branches exists.', fg='red', bold=True)
             return
         for b in branches:
             mark = '*' if b == current else ' '
@@ -455,18 +457,18 @@ def branch(name, create, delete, checkout, list_branches):
         return
     if delete:
         if not name:
-            secho('Please enter Branch-Name to delete.', fg='red')
+            secho('Please enter Branch-Name to delete.', fg='yellow', bold=True)
             return
         p = os.path.join(f.branches_path, name)
         if os.path.exists(p):
             os.remove(p)
-            secho(f"Branch '{name}' deleted.", fg='green')
+            secho(f"Branch '{name}' deleted.", fg='red', bold=True)
         else:
-            secho(f"Branch '{name}' not found.", fg='yellow')
+            secho(f"Branch '{name}' not found.", fg='red', bold=True)
         return
     if create:
         if not name:
-            secho('Please enter Branch-Name to create', fg='red')
+            secho('Please enter Branch-Name to create', fg='yellow', bold=True)
             return
         target = f.read_head()
         if not target:
@@ -475,25 +477,25 @@ def branch(name, create, delete, checkout, list_branches):
         p = os.path.join(f.branches_path, name)
         with open(p, 'w', encoding='utf-8') as fh:
             fh.write(target + '\n')
-        secho(f"Branch '{name}' on {target[:7]} created", fg='green')
+        secho(f"Branch '{name}' on {target[:7]} created", fg='green', bold=True)
         return
     if checkout:
         if not name:
-            secho('Please enter Branch-Name to checkout.', fg='red')
+            secho('Please enter Branch-Name to checkout.', fg='yellow', bold=True)
             return
         p = os.path.join(f.branches_path, name)
         if not os.path.exists(p):
-            secho(f"Branch '{name}' not found.", fg='red')
+            secho(f"Branch '{name}' not found.", fg='red', bold=True)
             return
         with open(p, 'r', encoding='utf-8') as fh:
             target = fh.read().strip()
         if not target:
-            secho('Branch has no Commit.', fg='red')
+            secho('Branch has no Commit.', fg='red', bold=True)
             return
         f.write_head(target)
         with open(head_branch_file, 'w', encoding='utf-8') as fh:
             fh.write(name + '\n')
-        secho(f"Switch to Branch '{name}' ({target[:7]}).", fg='green')
+        secho(f"Switch to Branch '{name}' ({target[:7]}).", fg='green', bold=True)
         return
     # Default: show hint
     secho('Use Actions: --list, --create, --delete, --checkout', fg='yellow')
@@ -511,13 +513,13 @@ def reset(yes, dry_run, backup_dir):
     """
     f = Forge()
     if not os.path.exists(f.base_path):
-        secho('No Repositorys found.', fg='yellow')
+        secho('No Repositorys found.', fg='red', bold=True)
         return
 
     to_remove = [f.objects_path, f.commits_path, f.index_path, f.head_path, f.tags_path, f.branches_path]
 
     if dry_run:
-        secho('Dry run — removed paths:', fg='yellow')
+        secho('Dry run — removed paths:', fg='green', bold=True)
         for p in to_remove:
             secho(f' - {p}')
         return
@@ -532,11 +534,11 @@ def reset(yes, dry_run, backup_dir):
 
     if backup_dir:
         if os.path.exists(backup_dir):
-            secho(f'Backup on {backup_dir} already exists', fg='red')
+            secho(f'Backup on {backup_dir} already exists', fg='red', bold=True)
             return
         try:
             shutil.copytree(f.base_path, backup_dir)
-            secho(f'Backup from {f.base_path} to {backup_dir} created', fg='green')
+            secho(f'Backup from {f.base_path} to {backup_dir} created', fg='green', bold=True)
         except Exception as e:
             secho(f'Error when create Backups: {e}', fg='red')
             return
@@ -545,7 +547,7 @@ def reset(yes, dry_run, backup_dir):
     try:
         shutil.rmtree(f.base_path)
     except Exception as e:
-        secho(f'Error when delete {f.base_path}: {e}', fg='red')
+        secho(f'Error when delete {f.base_path}: {e}', fg='red', bold=True)
         return
 
     # Neu anlegen
@@ -556,7 +558,7 @@ def reset(yes, dry_run, backup_dir):
     with open(f.head_path, 'w', encoding='utf-8') as _:
         _.write('')
     f.save_index({})
-    secho('Repository restored and initalized', fg='green')
+    secho('Repository restored and initalized', fg='green', bold=True)
 
 
 @cli.command()
@@ -582,9 +584,9 @@ def rm(cached, paths):
                     try:
                         os.remove(abs_p)
                     except Exception as e:
-                        secho(f"[Forge] >> Cannot {abs_p} delete {e}", fg='red')
+                        secho(f"[Forge] >> Cannot {abs_p} delete {e}", fg='red', bold=True)
         else:
-            secho(f"[Forge] >> {rel} not in Index.", fg='yellow')
+            secho(f"[Forge] >> {rel} not in Index.", fg='red', bold=True)
     f.save_index(index)
     secho(f"[Forge] >> {removed} Path(s) removed", fg='green', bold=True)
 
@@ -733,9 +735,9 @@ def show(object_hash, path_arg):
         rel = relpath(path_arg)
         obj_hash = index.get(rel)
         if not obj_hash:
-            secho(f"[Forge] >> {rel} not in Index.", fg='red')
+            secho(f"[Forge] >> {rel} not in Index.", fg='red', bold=True)
             return None
-        return show.callback(object_hash=obj_hash, path_arg=None)  # reuse
+        return show.callback(object_hash=obj_hash, path_arg=None)  # type: ignore
 
     secho("[Forge] >> Use --object or --path", fg='yellow')
     return None
