@@ -368,9 +368,10 @@ def log():
 @cli.command()
 @click.argument('name', required=False)
 @click.argument('commit', required=False)
+@click.option('--create', is_flag=True, help='Create a Tag at a Commit (default: HEAD)')
 @click.option('--delete', is_flag=True, help='Delete a Tag')
-@click.option('--list', 'list_tags', is_flag=True, help='List all Tags')
-def tag(name, commit, delete, list_tags):
+@click.option('--list', is_flag=True, help='List all Tags')
+def tag(name, commit, create, delete, list):
     """Create, delete or show tags (Release-Tags).
 
     Without options `tag` lists all available tags. With `name` a tag is created,
@@ -379,7 +380,24 @@ def tag(name, commit, delete, list_tags):
     f = Forge()
     f.ensure_repo()
     os.makedirs(f.tags_path, exist_ok=True)
-    if list_tags:
+
+    if create:
+        target = commit or f.read_head()
+        if not name:
+            secho('Please enter Tag-Name', fg='yellow', bold=True)
+            return
+        
+        if not target:
+            secho('No Commit (HEAD) exists.', fg='red', bold=True)
+            return
+    
+        p = os.path.join(f.tags_path, name)
+        with open(p, 'w', encoding='utf-8') as fh:
+            fh.write(target + '\n')
+        secho(f"Tag '{name}' to {target[:7]} set", fg='green', bold=True)
+        return 
+
+    if list:
         tags = sorted(os.listdir(f.tags_path))
         if not tags:
             secho("No Tags exists.", fg='yellow')
@@ -393,29 +411,21 @@ def tag(name, commit, delete, list_tags):
                 h = '?'
             secho(f"{t} -> {h}")
         return
+    
     if delete:
         if not name:
-            secho('Please enter Tag-Name to delete.', fg='red', bold=True)
+            secho('Please enter Tag-Name to delete.', fg='yellow', bold=True)
             return
         p = os.path.join(f.tags_path, name)
         if os.path.exists(p):
             os.remove(p)
-            secho(f"Tag '{name}' deleted.", fg='red', bold=True)
+            secho(f"Tag '{name}' deleted.", fg='green', bold=True)
         else:
             secho(f"Tag '{name}' not found", fg='red', bold=True)
         return
-    # create tag
-    if not name:
-        secho('Please enter Tag-Name', fg='green', bold=True)
-        return
-    target = commit or f.read_head()
-    if not target:
-        secho('No Commit (HEAD) exists.', fg='red', bold=True)
-        return
-    p = os.path.join(f.tags_path, name)
-    with open(p, 'w', encoding='utf-8') as fh:
-        fh.write(target + '\n')
-    secho(f"Tag '{name}' to {target[:7]} set", fg='green', bold=True)
+    
+    else:
+        secho('Use Actions: --create, --list, --delete', fg='yellow')
 
 @cli.command()
 @click.argument('name', required=False)
@@ -455,6 +465,7 @@ def branch(name, create, delete, checkout, list_branches):
                 h = '?'
             secho(f"{mark} {b} -> {h}")
         return
+    
     if delete:
         if not name:
             secho('Please enter Branch-Name to delete.', fg='yellow', bold=True)
@@ -466,6 +477,7 @@ def branch(name, create, delete, checkout, list_branches):
         else:
             secho(f"Branch '{name}' not found.", fg='red', bold=True)
         return
+    
     if create:
         if not name:
             secho('Please enter Branch-Name to create', fg='yellow', bold=True)
