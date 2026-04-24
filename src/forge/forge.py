@@ -180,7 +180,7 @@ def add(add_all, files):
     secho(f"[Forge] >> {added} Data added", fg="green", bold=True)
 
 @cli.command()
-@click.argument('--msg', 'message', type=str, required=True)
+@click.argument('message', type=str, required=True)
 def commit(message):
     """Creates a Snapshot with a message."""
     f = Forge()
