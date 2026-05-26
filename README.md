@@ -11,22 +11,68 @@ Local Version Control
 
 ## Installation
 
-Clone Repository
+### Windows Installation
 
+Install UV
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Create Virtual Environment [.venv]
+```bash
+uv venv
+```
+
+Install PIPX
+```bash
+uv pip install pipx
+```
+
+Clone Repository
 ```bash
 git clone https://github.com/mstvb/forge.git
 ```
 
 Go to Directory
-
 ```bash
 cd forge
 ```
 
-Install Package with PIP
-
+Install Package with PIPX
 ```bash
-pip install .
+uv run pipx install .
+```
+
+### Linux Installation
+
+Install UV
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Create Virtual Environment [.venv]
+```bash
+uv venv
+```
+
+Install PIPX
+```
+uv pip install pipx
+```
+
+Clone Repository
+```bash
+git clone https://github.com/mstvb/forge.git
+```
+
+Go to Directory
+```bash
+cd forge
+```
+
+Install Package with PIPX
+```bash
+uv run pipx install .
 ```
 
 ## Commands
